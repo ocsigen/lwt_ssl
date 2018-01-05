@@ -1,3 +1,14 @@
+===== 1.1.2 (2018-01-05) =====
+
+  * Actually put sockets into non-blocking mode on recent Lwt (ocsigen/lwt#530,
+    reported Romain Slootmaekers).
+
+===== 1.1.1 (2018-10-11) =====
+
+  * Compatibility with -safe-string, and thus OCaml 4.06. Lwt_ssl.read and
+    Lwt_ssl.write now take a buffer of type bytes as argument, rather than a
+    buffer of type string (ocsigen/lwt#479).
+
 ===== Lwt 3.1.0 (2017-07-19) =====
 
 ====== Miscellaneous ======
