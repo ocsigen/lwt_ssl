@@ -1,6 +1,6 @@
 # Lwt_ssl: OpenSSL binding with concurrent I/O
 
-An Lwt-enabled wrapper around [Ocaml-SSL][ocaml-ssl], that performs I/O
+An Lwt-enabled wrapper around [OCaml-SSL][ocaml-ssl], that performs I/O
 concurrently. Ocaml-SSL, in turn, is a binding to the much-used
 [OpenSSL][openssl].
 
