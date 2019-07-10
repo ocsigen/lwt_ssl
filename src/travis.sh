@@ -30,6 +30,8 @@ ocaml -version
 
 # Install dependencies.
 opam install conf-libev
+# https://github.com/savonet/ocaml-ssl/issues/52
+opam pin add -y --no-action ssl 0.5.7
 opam pin add -y --no-action lwt_ssl .
 opam install -y --deps-only lwt_ssl
 
