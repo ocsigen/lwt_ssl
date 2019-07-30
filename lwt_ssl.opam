@@ -19,6 +19,7 @@ depends: [
   "base-unix"
   "dune"
   "lwt" {>= "3.0.0"}
+  "ocaml"
   "ssl" {>= "0.5.0"}
 ]
 
