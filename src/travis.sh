@@ -5,8 +5,8 @@ set -x
 # Install system packages.
 case $TRAVIS_OS_NAME in
     linux)
-        wget https://github.com/ocaml/opam/releases/download/2.0.4/opam-2.0.4-x86_64-linux
-        sudo mv opam-2.0.4-x86_64-linux /usr/local/bin/opam
+        wget https://github.com/ocaml/opam/releases/download/2.0.5/opam-2.0.5-x86_64-linux
+        sudo mv opam-2.0.5-x86_64-linux /usr/local/bin/opam
         sudo chmod a+x /usr/local/bin/opam
         sudo apt-get update -qq
         sudo apt-get install -qq libev-dev
@@ -30,8 +30,6 @@ ocaml -version
 
 # Install dependencies.
 opam install conf-libev
-# https://github.com/savonet/ocaml-ssl/issues/52
-opam pin add -y --no-action ssl 0.5.7
 opam pin add -y --no-action lwt_ssl .
 opam install -y --deps-only lwt_ssl
 
@@ -39,3 +37,4 @@ opam install -y --deps-only lwt_ssl
 
 # Build and install Lwt_ssl. This is the only inherent test.
 opam install -y --verbose lwt_ssl
+opam lint
