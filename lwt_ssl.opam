@@ -15,11 +15,11 @@ dev-repo: "https://github.com/aantron/lwt_ssl.git"
 
 depends: [
   "base-unix"
-  "jbuilder" {build & >= "1.0+beta10"}
+  "dune"
   "lwt" {>= "3.0.0"}
   "ssl" {>= "0.5.0"}
 ]
 
 build: [
-  ["jbuilder" "build" "-p" name "-j" jobs]
+  ["dune" "build" "-p" name "-j" jobs]
 ]
