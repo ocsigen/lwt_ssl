@@ -1,9 +1,5 @@
 open Lwt.Infix
 
-let certfile = "./examples/server1.crt"
-
-let privkey = "./examples/server1.key"
-
 let log s = Lwt_io.printf "[II] %s\n%!" s
 
 let establish_server connection_handler ~port ~backlog_max_conn =
@@ -36,7 +32,7 @@ let establish_server connection_handler ~port ~backlog_max_conn =
   >>= fun () ->
   let server_sock = Lwt_unix.(socket PF_INET SOCK_STREAM 0) in
   let ssl_ctx = Ssl.create_context Ssl.SSLv23 Ssl.Server_context in
-  Ssl.use_certificate ssl_ctx certfile privkey ;
+  Ssl.use_certificate ssl_ctx "./examples/server1.crt" "./examples/server1.key" ;
   Lwt_unix.(setsockopt server_sock SO_REUSEADDR true) ;
   Lwt_unix.bind server_sock (Unix.ADDR_INET (Unix.inet_addr_any, port))
   >>= fun () ->
