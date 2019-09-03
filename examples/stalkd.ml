@@ -8,50 +8,44 @@ let port = 9876
 
 let log s = Lwt_io.printf "[II] %s\n%!" s
 
-let establish_server server_handler sockaddr nbconn =
-  let domain =
-    match sockaddr with
-    | Unix.ADDR_UNIX _ ->
-        Unix.PF_UNIX
-    | Unix.ADDR_INET (_, _) ->
-        Unix.PF_INET
-  in
-  let sock = Lwt_unix.(socket domain SOCK_STREAM 0) in
-  let handle_connection (s, caller) =
+type port = Port of int
+
+let establish_server connection_handler ~port ~backlog_max_conn =
+  let handle_client_connection (client_ssl_sock, client_addr) =
     let inet_addr_of_sockaddr = function
       | Unix.ADDR_INET (n, _) ->
           n
       | Unix.ADDR_UNIX _ ->
           Unix.inet_addr_any
     in
-    let inet_addr = inet_addr_of_sockaddr caller in
-    let ip = Unix.string_of_inet_addr inet_addr in
-    log (Printf.sprintf "opening connection for [%s]" ip)
+    let client_addr = inet_addr_of_sockaddr client_addr in
+    let client_ip = Unix.string_of_inet_addr client_addr in
+    log (Printf.sprintf "opening connection for [%s]" client_ip)
     >>= fun () ->
-    server_handler inet_addr s
-    >|= fun () -> Lwt_ssl.shutdown s Unix.SHUTDOWN_ALL
+    connection_handler client_addr client_ssl_sock
+    >|= fun () -> Lwt_ssl.shutdown client_ssl_sock Unix.SHUTDOWN_ALL
   in
-  let accept sock ssl_ctx =
-    let rec loop () =
-      let try_to_accept =
-        Lwt_unix.accept sock
-        >>= fun (client_sock, client_addr) ->
-        Lwt_ssl.ssl_accept client_sock ssl_ctx
-        >>= fun socket -> handle_connection (socket, client_addr)
-      in
-      Lwt.choose [ try_to_accept ] >>= fun () -> loop ()
+  let rec accept_clients server_sock ssl_ctx =
+    let try_to_accept =
+      Lwt_unix.accept server_sock
+      >>= fun (client_sock, client_addr) ->
+      Lwt_ssl.ssl_accept client_sock ssl_ctx
+      >>= fun client_ssl_sock ->
+      handle_client_connection (client_ssl_sock, client_addr)
     in
-    loop ()
+    Lwt.choose [ try_to_accept ]
+    >>= fun () -> accept_clients server_sock ssl_ctx
   in
-  log "establishing server"
+  log ("establishing server on localhost port: " ^ string_of_int port)
   >>= fun () ->
+  let server_sock = Lwt_unix.(socket PF_INET SOCK_STREAM 0) in
   let ssl_ctx = Ssl.create_context Ssl.SSLv23 Ssl.Server_context in
   Ssl.use_certificate ssl_ctx certfile privkey ;
-  Lwt_unix.(setsockopt sock SO_REUSEADDR true) ;
-  Lwt_unix.bind sock sockaddr
+  Lwt_unix.(setsockopt server_sock SO_REUSEADDR true) ;
+  Lwt_unix.bind server_sock (Unix.ADDR_INET (Unix.inet_addr_any, port))
   >>= fun () ->
-  Lwt_unix.listen sock nbconn ;
-  accept sock ssl_ctx
+  Lwt_unix.listen server_sock backlog_max_conn ;
+  accept_clients server_sock ssl_ctx
 
 
 let () =
@@ -62,7 +56,7 @@ let () =
   establish_server
     (fun addr lwt_ssl ->
       connected_clients := (addr, lwt_ssl) :: !connected_clients ;
-      let rec loop msg =
+      let rec talk msg =
         if msg = "exit"
         then (
           log "A client has quit"
@@ -88,9 +82,9 @@ let () =
               | Some s ->
                   Ssl.output_string s (Bytes.to_string m))
             !connected_clients ;
-          loop msg
+          talk msg
       in
-      log "accepted a new connection" >>= fun () -> loop "")
-    (Unix.ADDR_INET (Unix.inet_addr_any, port))
-    100
+      log "accepted a new connection" >>= fun () -> talk "")
+    ~port
+    ~backlog_max_conn:100
   |> Lwt_main.run
