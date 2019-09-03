@@ -9,8 +9,6 @@ let port = 9876
 let log s = Lwt_io.printf "[II] %s\n%!" s
 
 let establish_server server_handler sockaddr nbconn =
-  log "establishing server"
-  >>= fun () ->
   let domain =
     match sockaddr with
     | Unix.ADDR_UNIX _ ->
@@ -45,6 +43,8 @@ let establish_server server_handler sockaddr nbconn =
     in
     loop ()
   in
+  log "establishing server"
+  >>= fun () ->
   let ssl_ctx = Ssl.create_context Ssl.SSLv23 Ssl.Server_context in
   Ssl.use_certificate ssl_ctx certfile privkey ;
   Lwt_unix.(setsockopt sock SO_REUSEADDR true) ;
