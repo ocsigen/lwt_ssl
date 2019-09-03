@@ -7,9 +7,9 @@ let sp = Printf.sprintf
 let establish_server connection_handler ~port ~max_backlog_conn =
   let addr_string = function
     | Unix.ADDR_INET (n, p) ->
-        sp "[%s: %s]" (Unix.string_of_inet_addr n) (string_of_int p)
+        sp "%s: %s" (Unix.string_of_inet_addr n) (string_of_int p)
     | Unix.ADDR_UNIX _ ->
-        sp "[%s]" Unix.(string_of_inet_addr inet_addr_any)
+        sp "%s" Unix.(string_of_inet_addr inet_addr_any)
   in
   let handle_client_connection (client_ssl, client_addr) =
     Lwt.async (fun () ->
