@@ -2,13 +2,9 @@ open Lwt.Infix
 
 let certfile = "./examples/server1.crt"
 
-let privkey = "./examples/server.key"
-
-let port = 9876
+let privkey = "./examples/server1.key"
 
 let log s = Lwt_io.printf "[II] %s\n%!" s
-
-type port = Port of int
 
 let establish_server connection_handler ~port ~backlog_max_conn =
   let handle_client_connection (client_ssl_sock, client_addr) =
@@ -45,46 +41,51 @@ let establish_server connection_handler ~port ~backlog_max_conn =
   Lwt_unix.bind server_sock (Unix.ADDR_INET (Unix.inet_addr_any, port))
   >>= fun () ->
   Lwt_unix.listen server_sock backlog_max_conn ;
-  accept_clients server_sock ssl_ctx
+  log "listening for connections"
+  >>= fun () -> accept_clients server_sock ssl_ctx
+
+
+let bufsize = 1024
+
+let buf = Bytes.create bufsize
+
+let connected_clients = ref []
+
+let connection_handler client_addr client_lwt_ssl =
+  connected_clients := (client_addr, client_lwt_ssl) :: !connected_clients ;
+  let rec talk msg =
+    if msg = "exit"
+    then (
+      log "A client has quit"
+      >|= fun () ->
+      connected_clients :=
+        List.filter
+          (fun (_, lwt_ssl') -> lwt_ssl' != client_lwt_ssl)
+          !connected_clients ;
+      Lwt_ssl.shutdown client_lwt_ssl Unix.SHUTDOWN_ALL )
+    else
+      Lwt_ssl.read client_lwt_ssl buf 0 bufsize
+      >>= fun l ->
+      let m = Bytes.sub buf 0 l in
+      let msg = Bytes.sub m 0 (Bytes.length m - 1) in
+      let msg = Bytes.to_string msg in
+      log (Printf.sprintf "received '%s'" msg)
+      >>= fun () ->
+      List.iter
+        (fun (_, lwt_ssl') ->
+          match Lwt_ssl.ssl_socket lwt_ssl' with
+          | None ->
+              ()
+          | Some s ->
+              Ssl.output_string s (Bytes.to_string m))
+        !connected_clients ;
+      talk msg
+  in
+  log "accepted a new connection" >>= fun () -> talk ""
 
 
 let () =
-  let bufsize = 1024 in
-  let buf = Bytes.create bufsize in
-  let connected_clients = ref [] in
+  let port = try int_of_string Sys.argv.(1) with _ -> 9876 in
   Ssl.init () ;
-  establish_server
-    (fun addr lwt_ssl ->
-      connected_clients := (addr, lwt_ssl) :: !connected_clients ;
-      let rec talk msg =
-        if msg = "exit"
-        then (
-          log "A client has quit"
-          >|= fun () ->
-          connected_clients :=
-            List.filter
-              (fun (_, lwt_ssl') -> lwt_ssl' != lwt_ssl)
-              !connected_clients ;
-          Lwt_ssl.shutdown lwt_ssl Unix.SHUTDOWN_ALL )
-        else
-          Lwt_ssl.read lwt_ssl buf 0 bufsize
-          >>= fun l ->
-          let m = Bytes.sub buf 0 l in
-          let msg = Bytes.sub m 0 (Bytes.length m - 1) in
-          let msg = Bytes.to_string msg in
-          log (Printf.sprintf "received '%s'" msg)
-          >>= fun () ->
-          List.iter
-            (fun (_, lwt_ssl') ->
-              match Lwt_ssl.ssl_socket lwt_ssl' with
-              | None ->
-                  ()
-              | Some s ->
-                  Ssl.output_string s (Bytes.to_string m))
-            !connected_clients ;
-          talk msg
-      in
-      log "accepted a new connection" >>= fun () -> talk "")
-    ~port
-    ~backlog_max_conn:100
+  establish_server connection_handler ~port ~backlog_max_conn:100
   |> Lwt_main.run
