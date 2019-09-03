@@ -5,19 +5,17 @@ let log s = Lwt_io.printf "[stalkd] %s\n%!" s
 let sp = Printf.sprintf
 
 let establish_server connection_handler ~port ~max_backlog_conn =
-  let inet_addr_of_sockaddr = function
-    | Unix.ADDR_INET (n, _) ->
-        n
+  let addr_string = function
+    | Unix.ADDR_INET (n, p) ->
+        sp "[%s: %s]" (Unix.string_of_inet_addr n) (string_of_int p)
     | Unix.ADDR_UNIX _ ->
-        Unix.inet_addr_any
+        sp "[%s]" Unix.(string_of_inet_addr inet_addr_any)
   in
-  let handle_client_connection (client_ssl_sock, client_addr) =
+  let handle_client_connection (client_ssl, client_addr) =
     Lwt.async (fun () ->
-        let client_addr = inet_addr_of_sockaddr client_addr in
-        let client_ip = Unix.string_of_inet_addr client_addr in
-        log (Printf.sprintf "opening connection for [%s]" client_ip)
-        <&> connection_handler client_addr client_ssl_sock
-        >|= fun () -> Lwt_ssl.shutdown client_ssl_sock Unix.SHUTDOWN_ALL)
+        log (sp "opening connection for [%s]" @@ addr_string client_addr)
+        <&> connection_handler client_addr client_ssl
+        >|= fun () -> Lwt_ssl.shutdown client_ssl Unix.SHUTDOWN_ALL)
   in
   let rec accept_clients server_sock ssl_ctx =
     Lwt.catch
@@ -32,7 +30,7 @@ let establish_server connection_handler ~port ~max_backlog_conn =
         log (sp "error while accepting clients, %s" @@ Printexc.to_string exn))
   in
   log ("establishing server on localhost port: " ^ string_of_int port)
-  >>= fun () ->
+  <&>
   let server_sock = Lwt_unix.(socket PF_INET SOCK_STREAM 0) in
   let ssl_ctx = Ssl.create_context Ssl.SSLv23 Ssl.Server_context in
   Ssl.use_certificate ssl_ctx "./examples/server1.crt" "./examples/server1.key" ;
@@ -40,8 +38,7 @@ let establish_server connection_handler ~port ~max_backlog_conn =
   Lwt_unix.bind server_sock (Unix.ADDR_INET (Unix.inet_addr_any, port))
   >>= fun () ->
   Lwt_unix.listen server_sock max_backlog_conn ;
-  log "listening for connections"
-  >>= fun () -> accept_clients server_sock ssl_ctx
+  log "listening for connections" <&> accept_clients server_sock ssl_ctx
 
 
 let bufsize = 1024
@@ -68,7 +65,7 @@ let connection_handler client_addr client_lwt_ssl =
       let m = Bytes.sub buf 0 l in
       let msg = Bytes.sub m 0 (Bytes.length m - 1) in
       let msg = Bytes.to_string msg in
-      log (Printf.sprintf "received '%s'" msg)
+      log (sp "received '%s'" msg)
       >>= fun () ->
       List.iter
         (fun (_, lwt_ssl') ->
