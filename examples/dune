@@ -1,0 +1,7 @@
+(alias
+ (name default)
+ (deps stalkd.exe))
+
+(executables
+ (names stalkd)
+ (libraries lwt lwt.unix lwt_ssl))
