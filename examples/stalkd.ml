@@ -3,26 +3,26 @@ open Lwt.Infix
 let log s = Lwt_io.printf "[II] %s\n%!" s
 
 let establish_server connection_handler ~port ~backlog_max_conn =
+  let inet_addr_of_sockaddr = function
+    | Unix.ADDR_INET (n, _) ->
+        n
+    | Unix.ADDR_UNIX _ ->
+        Unix.inet_addr_any
+  in
   let handle_client_connection (client_ssl_sock, client_addr) =
-    let inet_addr_of_sockaddr = function
-      | Unix.ADDR_INET (n, _) ->
-          n
-      | Unix.ADDR_UNIX _ ->
-          Unix.inet_addr_any
-    in
-    let client_addr = inet_addr_of_sockaddr client_addr in
-    let client_ip = Unix.string_of_inet_addr client_addr in
-    log (Printf.sprintf "opening connection for [%s]" client_ip)
-    >>= fun () ->
-    connection_handler client_addr client_ssl_sock
-    >|= fun () -> Lwt_ssl.shutdown client_ssl_sock Unix.SHUTDOWN_ALL
+    Lwt.async (fun () ->
+        let client_addr = inet_addr_of_sockaddr client_addr in
+        let client_ip = Unix.string_of_inet_addr client_addr in
+        log (Printf.sprintf "opening connection for [%s]" client_ip)
+        <&> connection_handler client_addr client_ssl_sock
+        >|= fun () -> Lwt_ssl.shutdown client_ssl_sock Unix.SHUTDOWN_ALL)
   in
   let rec accept_clients server_sock ssl_ctx =
     let try_to_accept =
       Lwt_unix.accept server_sock
       >>= fun (client_sock, client_addr) ->
       Lwt_ssl.ssl_accept client_sock ssl_ctx
-      >>= fun client_ssl_sock ->
+      >|= fun client_ssl_sock ->
       handle_client_connection (client_ssl_sock, client_addr)
     in
     Lwt.choose [ try_to_accept ]
