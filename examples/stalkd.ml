@@ -1,8 +1,10 @@
 open Lwt.Infix
 
-let log s = Lwt_io.printf "[II] %s\n%!" s
+let log s = Lwt_io.printf "[stalkd] %s\n%!" s
 
-let establish_server connection_handler ~port ~backlog_max_conn =
+let sp = Printf.sprintf
+
+let establish_server connection_handler ~port ~max_backlog_conn =
   let inet_addr_of_sockaddr = function
     | Unix.ADDR_INET (n, _) ->
         n
@@ -18,15 +20,16 @@ let establish_server connection_handler ~port ~backlog_max_conn =
         >|= fun () -> Lwt_ssl.shutdown client_ssl_sock Unix.SHUTDOWN_ALL)
   in
   let rec accept_clients server_sock ssl_ctx =
-    let try_to_accept =
-      Lwt_unix.accept server_sock
-      >>= fun (client_sock, client_addr) ->
-      Lwt_ssl.ssl_accept client_sock ssl_ctx
-      >|= fun client_ssl_sock ->
-      handle_client_connection (client_ssl_sock, client_addr)
-    in
-    Lwt.choose [ try_to_accept ]
-    >>= fun () -> accept_clients server_sock ssl_ctx
+    Lwt.catch
+      (fun () ->
+        Lwt_unix.accept server_sock
+        >>= fun (client_sock, client_addr) ->
+        Lwt_ssl.ssl_accept client_sock ssl_ctx
+        >>= fun client_ssl_sock ->
+        handle_client_connection (client_ssl_sock, client_addr) ;
+        accept_clients server_sock ssl_ctx)
+      (fun exn ->
+        log (sp "error while accepting clients, %s" @@ Printexc.to_string exn))
   in
   log ("establishing server on localhost port: " ^ string_of_int port)
   >>= fun () ->
@@ -36,7 +39,7 @@ let establish_server connection_handler ~port ~backlog_max_conn =
   Lwt_unix.(setsockopt server_sock SO_REUSEADDR true) ;
   Lwt_unix.bind server_sock (Unix.ADDR_INET (Unix.inet_addr_any, port))
   >>= fun () ->
-  Lwt_unix.listen server_sock backlog_max_conn ;
+  Lwt_unix.listen server_sock max_backlog_conn ;
   log "listening for connections"
   >>= fun () -> accept_clients server_sock ssl_ctx
 
@@ -83,5 +86,5 @@ let connection_handler client_addr client_lwt_ssl =
 let () =
   let port = try int_of_string Sys.argv.(1) with _ -> 9876 in
   Ssl.init () ;
-  establish_server connection_handler ~port ~backlog_max_conn:100
+  establish_server connection_handler ~port ~max_backlog_conn:100
   |> Lwt_main.run
