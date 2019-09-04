@@ -56,8 +56,7 @@ let connection_handler client_addr client_ssl =
         connected_clients :=
           List.filter
             (fun (_, client_ssl') -> client_ssl' != client_ssl)
-            !connected_clients ;
-        Lwt_ssl.shutdown client_ssl Unix.SHUTDOWN_ALL
+            !connected_clients
     | _ ->
         Lwt_ssl.read client_ssl buf 0 bufsize
         >>= fun l ->
