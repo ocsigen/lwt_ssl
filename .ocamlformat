@@ -1,0 +1,6 @@
+profile=sparse
+function-indent=0
+match-indent=0
+function-indent-nested=always
+match-indent-nested=always
+max-indent=2
