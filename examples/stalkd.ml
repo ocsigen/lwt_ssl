@@ -64,7 +64,7 @@ let connection_handler : connection_handler =
    <&>
    ( connected_clients :=
      List.filter
-       (fun (_, client_ssl') -> client_ssl' != client_ssl)
+       (fun client_ssl' -> client_ssl' != client_ssl)
        !connected_clients ;
      Lwt_ssl.ssl_shutdown client_ssl )
  | _ ->
@@ -76,13 +76,13 @@ let connection_handler : connection_handler =
    | Some line ->
      log (sp "received '%s'" line)
      <&> Lwt_list.iter_p
-       (fun (_, client_ssl') ->
+       (fun client_ssl' ->
          let oc = Lwt_ssl.out_channel_of_descr client_ssl' in
          Lwt_io.write_line oc line)
            !connected_clients
      >>= fun () -> talk line)
  in
- connected_clients := (client_addr, client_ssl) :: !connected_clients ;
+ connected_clients := client_ssl :: !connected_clients ;
  talk ""
 
 
