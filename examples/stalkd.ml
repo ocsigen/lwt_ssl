@@ -58,7 +58,6 @@ let connected_clients = ref []
 
 let connection_handler : connection_handler =
  fun client_addr client_ssl ->
- connected_clients := (client_addr, client_ssl) :: !connected_clients ;
  let rec talk = function
  | "exit" ->
    log (sp "client [%s] has quit" @@ addr_string client_addr)
@@ -83,6 +82,7 @@ let connection_handler : connection_handler =
            !connected_clients
      >>= fun () -> talk line)
  in
+ connected_clients := (client_addr, client_ssl) :: !connected_clients ;
  talk ""
 
 
