@@ -23,8 +23,8 @@ let establish_server connection_handler ~port ~max_backlog_conn =
         Lwt_unix.accept server_sock
         >>= fun (client_sock, client_addr) ->
         Lwt_ssl.ssl_accept client_sock ssl_ctx
-        >>= fun client_ssl_sock ->
-        handle_client_connection (client_ssl_sock, client_addr) ;
+        >>= fun client_ssl ->
+        handle_client_connection (client_ssl, client_addr) ;
         accept_clients server_sock ssl_ctx)
       (fun exn ->
         log (sp "error while accepting clients, %s" @@ Printexc.to_string exn))
@@ -47,8 +47,8 @@ let buf = Bytes.create bufsize
 
 let connected_clients = ref []
 
-let connection_handler client_addr client_lwt_ssl =
-  connected_clients := (client_addr, client_lwt_ssl) :: !connected_clients ;
+let connection_handler client_addr client_ssl =
+  connected_clients := (client_addr, client_ssl) :: !connected_clients ;
   let rec talk msg =
     if msg = "exit"
     then (
@@ -56,11 +56,11 @@ let connection_handler client_addr client_lwt_ssl =
       >|= fun () ->
       connected_clients :=
         List.filter
-          (fun (_, lwt_ssl') -> lwt_ssl' != client_lwt_ssl)
+          (fun (_, client_ssl') -> client_ssl' != client_ssl)
           !connected_clients ;
-      Lwt_ssl.shutdown client_lwt_ssl Unix.SHUTDOWN_ALL )
+      Lwt_ssl.shutdown client_ssl Unix.SHUTDOWN_ALL )
     else
-      Lwt_ssl.read client_lwt_ssl buf 0 bufsize
+      Lwt_ssl.read client_ssl buf 0 bufsize
       >>= fun l ->
       let m = Bytes.sub buf 0 l in
       let msg = Bytes.sub m 0 (Bytes.length m - 1) in
