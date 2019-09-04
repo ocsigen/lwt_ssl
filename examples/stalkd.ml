@@ -11,16 +11,18 @@ let addr_string : Unix.sockaddr -> string = function
   sp "%s" Unix.(string_of_inet_addr inet_addr_any)
 
 
-let establish_server connection_handler :
-  port:int -> max_backlog_conn:int -> unit Lwt.t =
- fun ~port ~max_backlog_conn ->
+type connection_handler = Unix.sockaddr -> Lwt_ssl.socket -> unit Lwt.t
+
+let establish_server :
+  connection_handler -> port:int -> max_backlog_conn:int -> unit Lwt.t =
+ fun connection_handler ~port ~max_backlog_conn ->
  let handle_client_connection (client_ssl, client_addr) =
    Lwt.async
    @@ fun () ->
    Lwt.catch
      (fun () ->
        log (sp "opening connection for [%s]" @@ addr_string client_addr)
-       <&> connection_handler client_addr client_ssl)
+       >>= fun () -> connection_handler client_addr client_ssl)
      (fun exn ->
        log (sp "error while talking with client %s" (Printexc.to_string exn)))
  in
@@ -31,6 +33,8 @@ let establish_server connection_handler :
        >>= fun (client_sock, client_addr) ->
        Lwt_ssl.ssl_accept client_sock ssl_ctx
        >>= fun client_ssl ->
+       log "accepted a new connection"
+       >>= fun () ->
        handle_client_connection (client_ssl, client_addr) ;
        accept_clients server_sock ssl_ctx)
      (fun exn ->
@@ -52,7 +56,7 @@ let establish_server connection_handler :
 
 let connected_clients = ref []
 
-let connection_handler : Unix.sockaddr -> Lwt_ssl.socket -> unit Lwt.t =
+let connection_handler : connection_handler =
  fun client_addr client_ssl ->
  connected_clients := (client_addr, client_ssl) :: !connected_clients ;
  let rec talk = function
@@ -79,7 +83,7 @@ let connection_handler : Unix.sockaddr -> Lwt_ssl.socket -> unit Lwt.t =
            !connected_clients
      >>= fun () -> talk line)
  in
- log "accepted a new connection" >>= fun () -> talk ""
+ talk ""
 
 
 let () =
