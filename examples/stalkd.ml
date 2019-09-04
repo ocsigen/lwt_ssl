@@ -4,15 +4,16 @@ let log s = Lwt_io.printf "[stalkd] %s\n%!" s
 
 let sp = Printf.sprintf
 
+let addr_string : Unix.sockaddr -> string = function
+| Unix.ADDR_INET (n, p) ->
+  sp "%s: %s" (Unix.string_of_inet_addr n) (string_of_int p)
+| Unix.ADDR_UNIX _ ->
+  sp "%s" Unix.(string_of_inet_addr inet_addr_any)
+
+
 let establish_server connection_handler :
   port:int -> max_backlog_conn:int -> unit Lwt.t =
  fun ~port ~max_backlog_conn ->
- let addr_string = function
- | Unix.ADDR_INET (n, p) ->
-   sp "%s: %s" (Unix.string_of_inet_addr n) (string_of_int p)
- | Unix.ADDR_UNIX _ ->
-   sp "%s" Unix.(string_of_inet_addr inet_addr_any)
- in
  let handle_client_connection (client_ssl, client_addr) =
    Lwt.async
    @@ fun () ->
@@ -58,7 +59,7 @@ let connection_handler : Unix.sockaddr -> Lwt_ssl.socket -> unit Lwt.t =
  connected_clients := (client_addr, client_ssl) :: !connected_clients ;
  let rec talk = function
  | "exit" ->
-   log "A client has quit"
+   log (sp "client [%s] has quit" @@ addr_string client_addr)
    <&>
    ( connected_clients :=
      List.filter
