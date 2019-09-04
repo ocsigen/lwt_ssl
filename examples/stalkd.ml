@@ -37,7 +37,7 @@ let establish_server connection_handler :
        log (sp "error while accepting clients, %s" @@ Printexc.to_string exn))
  in
  log ("establishing server on localhost port: " ^ string_of_int port)
- <&>
+ >>= fun () ->
  let ssl_ctx = Ssl.create_context Ssl.SSLv23 Ssl.Server_context in
  Ssl.use_certificate ssl_ctx "./examples/server1.crt" "./examples/server1.key" ;
  Lwt_unix.(
@@ -46,12 +46,9 @@ let establish_server connection_handler :
    bind server_sock (Unix.ADDR_INET (Unix.inet_addr_any, port))
    >>= fun () ->
    listen server_sock max_backlog_conn ;
-   log "listening for connections" <&> accept_clients server_sock ssl_ctx)
+   log "listening for connections"
+   >>= fun () -> accept_clients server_sock ssl_ctx)
 
-
-let bufsize = 1024
-
-let buf = Bytes.create bufsize
 
 let connected_clients = ref []
 
@@ -68,22 +65,19 @@ let connection_handler : Unix.sockaddr -> Lwt_ssl.socket -> unit Lwt.t =
        !connected_clients ;
      Lwt_ssl.ssl_shutdown client_ssl )
  | _ ->
-   Lwt_ssl.read client_ssl buf 0 bufsize
-   >>= fun l ->
-   let m = Bytes.sub buf 0 l in
-   let msg = Bytes.sub m 0 (Bytes.length m - 1) in
-   let msg = Bytes.to_string msg in
-   log (sp "received '%s'" msg)
-   >>= fun () ->
-   List.iter
-     (fun (_, lwt_ssl') ->
-       match Lwt_ssl.ssl_socket lwt_ssl' with
-       | None ->
-         ()
-       | Some s ->
-         Ssl.output_string s (Bytes.to_string m))
-     !connected_clients ;
-   talk msg
+   let ic = Lwt_ssl.in_channel_of_descr client_ssl in
+   Lwt_io.read_line_opt ic
+   >>= (function
+   | None ->
+     Lwt.return_unit
+   | Some line ->
+     log (sp "received '%s'" line)
+     <&> Lwt_list.iter_p
+       (fun (_, client_ssl') ->
+         let oc = Lwt_ssl.out_channel_of_descr client_ssl' in
+         Lwt_io.write_line oc line)
+           !connected_clients
+     >>= fun () -> talk line)
  in
  log "accepted a new connection" >>= fun () -> talk ""
 
