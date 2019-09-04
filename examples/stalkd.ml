@@ -49,33 +49,32 @@ let connected_clients = ref []
 
 let connection_handler client_addr client_ssl =
   connected_clients := (client_addr, client_ssl) :: !connected_clients ;
-  let rec talk msg =
-    if msg = "exit"
-    then (
-      log "A client has quit"
-      >|= fun () ->
-      connected_clients :=
-        List.filter
-          (fun (_, client_ssl') -> client_ssl' != client_ssl)
+  let rec talk = function
+    | "exit" ->
+        log "A client has quit"
+        >|= fun () ->
+        connected_clients :=
+          List.filter
+            (fun (_, client_ssl') -> client_ssl' != client_ssl)
+            !connected_clients ;
+        Lwt_ssl.shutdown client_ssl Unix.SHUTDOWN_ALL
+    | _ ->
+        Lwt_ssl.read client_ssl buf 0 bufsize
+        >>= fun l ->
+        let m = Bytes.sub buf 0 l in
+        let msg = Bytes.sub m 0 (Bytes.length m - 1) in
+        let msg = Bytes.to_string msg in
+        log (sp "received '%s'" msg)
+        >>= fun () ->
+        List.iter
+          (fun (_, lwt_ssl') ->
+            match Lwt_ssl.ssl_socket lwt_ssl' with
+            | None ->
+                ()
+            | Some s ->
+                Ssl.output_string s (Bytes.to_string m))
           !connected_clients ;
-      Lwt_ssl.shutdown client_ssl Unix.SHUTDOWN_ALL )
-    else
-      Lwt_ssl.read client_ssl buf 0 bufsize
-      >>= fun l ->
-      let m = Bytes.sub buf 0 l in
-      let msg = Bytes.sub m 0 (Bytes.length m - 1) in
-      let msg = Bytes.to_string msg in
-      log (sp "received '%s'" msg)
-      >>= fun () ->
-      List.iter
-        (fun (_, lwt_ssl') ->
-          match Lwt_ssl.ssl_socket lwt_ssl' with
-          | None ->
-              ()
-          | Some s ->
-              Ssl.output_string s (Bytes.to_string m))
-        !connected_clients ;
-      talk msg
+        talk msg
   in
   log "accepted a new connection" >>= fun () -> talk ""
 
