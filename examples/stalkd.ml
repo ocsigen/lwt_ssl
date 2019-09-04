@@ -14,10 +14,14 @@ let establish_server connection_handler :
    sp "%s" Unix.(string_of_inet_addr inet_addr_any)
  in
  let handle_client_connection (client_ssl, client_addr) =
-   Lwt.async (fun () ->
-     log (sp "opening connection for [%s]" @@ addr_string client_addr)
-     <&> connection_handler client_addr client_ssl
-     >|= fun () -> Lwt_ssl.ssl_shutdown client_ssl)
+   Lwt.async
+   @@ fun () ->
+   Lwt.catch
+     (fun () ->
+       log (sp "opening connection for [%s]" @@ addr_string client_addr)
+       <&> connection_handler client_addr client_ssl)
+     (fun exn ->
+       log (sp "error while talking with client %s" (Printexc.to_string exn)))
  in
  let rec accept_clients server_sock ssl_ctx =
    Lwt.catch
@@ -55,11 +59,12 @@ let connection_handler : Unix.sockaddr -> Lwt_ssl.socket -> unit Lwt.t =
  let rec talk = function
  | "exit" ->
    log "A client has quit"
-   >|= fun () ->
-   connected_clients :=
+   <&>
+   ( connected_clients :=
      List.filter
        (fun (_, client_ssl') -> client_ssl' != client_ssl)
-       !connected_clients
+       !connected_clients ;
+     Lwt_ssl.ssl_shutdown client_ssl )
  | _ ->
    Lwt_ssl.read client_ssl buf 0 bufsize
    >>= fun l ->
