@@ -1,7 +1,14 @@
+(* A Simple Talk daemon implemented using lwt_ssl, and lwt.
+ *
+ * Start stalkd : dune exec examples/stalkd.exe
+ * Use gnutls-cli to talk to the client : gnutls-cli localhost -p 9876 --no-ca-verification
+ *)
 open Lwt.Infix
 
+(* Logger *)
 let logf fmt = Printf.kprintf (fun msg -> Lwt_io.printlf "[stalkd] %s" msg) fmt
 
+(* Converts Unix.sockaddr into a string. *)
 let addr_string : Unix.sockaddr -> string = function
 | Unix.ADDR_INET (n, p) ->
   Printf.sprintf "%s: %d" (Unix.string_of_inet_addr n) p
@@ -9,6 +16,9 @@ let addr_string : Unix.sockaddr -> string = function
   Printf.sprintf "%s" Unix.(string_of_inet_addr inet_addr_any)
 
 
+(* Represents a connection handler. This is invoked after each client is accepted by
+ * the server.
+ *)
 type connection_handler = Unix.sockaddr -> Lwt_ssl.socket -> unit Lwt.t
 
 let establish_server :
