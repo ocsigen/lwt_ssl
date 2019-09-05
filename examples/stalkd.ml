@@ -1,14 +1,12 @@
 open Lwt.Infix
 
-let log s = Lwt_io.printf "[stalkd] %s\n%!" s
-
-let sp = Printf.sprintf
+let logf fmt = Printf.kprintf (fun msg -> Lwt_io.printlf "[stalkd] %s" msg) fmt
 
 let addr_string : Unix.sockaddr -> string = function
 | Unix.ADDR_INET (n, p) ->
-  sp "%s: %s" (Unix.string_of_inet_addr n) (string_of_int p)
+  Printf.sprintf "%s: %d" (Unix.string_of_inet_addr n) p
 | Unix.ADDR_UNIX _ ->
-  sp "%s" Unix.(string_of_inet_addr inet_addr_any)
+  Printf.sprintf "%s" Unix.(string_of_inet_addr inet_addr_any)
 
 
 type connection_handler = Unix.sockaddr -> Lwt_ssl.socket -> unit Lwt.t
@@ -21,10 +19,10 @@ let establish_server :
    @@ fun () ->
    Lwt.catch
      (fun () ->
-       log (sp "opening connection for [%s]" @@ addr_string client_addr)
+       logf "opening connection for [%s]" @@ addr_string client_addr
        >>= fun () -> connection_handler client_addr client_ssl)
      (fun exn ->
-       log (sp "error while talking with client %s" (Printexc.to_string exn)))
+       logf "error while talking with client %s" (Printexc.to_string exn))
  in
  let rec accept_clients server_sock ssl_ctx =
    Lwt.catch
@@ -33,14 +31,14 @@ let establish_server :
        >>= fun (client_sock, client_addr) ->
        Lwt_ssl.ssl_accept client_sock ssl_ctx
        >>= fun client_ssl ->
-       log "accepted a new connection"
+       logf "accepted a new connection"
        >>= fun () ->
        handle_client_connection (client_ssl, client_addr) ;
        accept_clients server_sock ssl_ctx)
      (fun exn ->
-       log (sp "error while accepting clients, %s" @@ Printexc.to_string exn))
+       logf "error while accepting clients, %s" @@ Printexc.to_string exn)
  in
- log ("establishing server on localhost port: " ^ string_of_int port)
+ logf "establishing server on localhost port: %d" port
  >>= fun () ->
  let ssl_ctx = Ssl.create_context Ssl.SSLv23 Ssl.Server_context in
  Ssl.use_certificate ssl_ctx "./examples/server1.crt" "./examples/server1.key" ;
@@ -50,7 +48,7 @@ let establish_server :
    bind server_sock (Unix.ADDR_INET (Unix.inet_addr_any, port))
    >>= fun () ->
    listen server_sock max_backlog_conn ;
-   log "listening for connections"
+   logf "listening for connections"
    >>= fun () -> accept_clients server_sock ssl_ctx)
 
 
@@ -60,7 +58,7 @@ let connection_handler : connection_handler =
  fun client_addr client_ssl ->
  let rec talk = function
  | "exit" ->
-   log (sp "client [%s] has quit" @@ addr_string client_addr)
+   logf "client [%s] has quit" @@ addr_string client_addr
    <&>
    ( connected_clients :=
      List.filter
@@ -74,7 +72,7 @@ let connection_handler : connection_handler =
    | None ->
      Lwt.return_unit
    | Some line ->
-     log (sp "received '%s'" line)
+     logf "received '%s'" line
      <&> Lwt_list.iter_p
        (fun client_ssl' ->
          let oc = Lwt_ssl.out_channel_of_descr client_ssl' in
