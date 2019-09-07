@@ -23,6 +23,9 @@ matrix:
 
 script: bash -e src/travis.sh
 
+before_cache:
+  - opam clean
+
 cache:
   directories:
     - $HOME/.opam
