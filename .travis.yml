@@ -23,6 +23,9 @@ matrix:
     - os: linux
       env: COMPILER=4.02.3
 
+before_install:
+  - '[ "$TRAVIS_EVENT_TYPE" != cron ] || rm -rf ~/.opam ./_opam'
+
 install:
   - |
     case $TRAVIS_OS_NAME in
