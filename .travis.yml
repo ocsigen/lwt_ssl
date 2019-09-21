@@ -23,7 +23,44 @@ matrix:
     - os: linux
       env: COMPILER=4.02.3
 
-script: bash -e src/travis.sh
+install:
+  - |
+    case $TRAVIS_OS_NAME in
+      linux)
+        sudo apt-get update -qq
+        sudo apt-get install -qq libev-dev
+        OS=linux
+        ;;
+      osx)
+        brew update > /dev/null
+        brew install libev
+        OS=macos
+        ;;
+    esac
+
+  - VERSION=2.0.5
+  - FILENAME=opam-$VERSION-x86_64-$OS
+  - wget https://github.com/ocaml/opam/releases/download/$VERSION/$FILENAME
+  - sudo mv $FILENAME /usr/local/bin/opam
+  - sudo chmod a+x /usr/local/bin/opam
+
+  - opam init -y --bare --disable-sandboxing --disable-shell-hook
+  - |
+    if [ ! -d _opam/bin ]
+    then
+      rm -rf _opam
+      opam switch create . $COMPILER $REPOSITORIES --no-install
+    fi
+  - eval `opam config env`
+  - opam --version
+  - ocaml -version
+
+  - opam install conf-libev
+  - opam install -y --deps-only .
+
+script:
+  - dune build
+  - opam lint
 
 before_cache:
   - opam clean
