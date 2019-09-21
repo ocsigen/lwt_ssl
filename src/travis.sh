@@ -46,11 +46,10 @@ ocaml -version
 
 # Install dependencies.
 opam install conf-libev
-opam pin add -y --no-action lwt_ssl .
-opam install -y --deps-only lwt_ssl
+opam install -y --deps-only .
 
 
 
-# Build and install Lwt_ssl. This is the only inherent test.
-opam install -y --verbose lwt_ssl
+# Build and install Lwt_ssl. This is the only test.
+make
 opam lint
