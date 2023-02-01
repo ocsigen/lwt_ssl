@@ -1,4 +1,5 @@
-===== Unreleased =====
+1.2.0 (2023-02-01)
+--------------
 
   * add Lwt_ssl.close_notify to issue one-way SSL shutdown (#2, @madroach).
   * use Lwt.pause instead of the deprecated Lwt_unix.yield (#3, @anmonteiro).
