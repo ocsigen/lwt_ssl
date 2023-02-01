@@ -154,12 +154,12 @@ let write_bytes (fd, s) buf pos len =
 let wait_read (fd, s) =
   match s with
     Plain -> Lwt_unix.wait_read fd
-  | SSL _ -> Lwt_unix.yield ()
+  | SSL _ -> Lwt.pause ()
 
 let wait_write (fd, s) =
   match s with
     Plain -> Lwt_unix.wait_write fd
-  | SSL _ -> Lwt_unix.yield ()
+  | SSL _ -> Lwt.pause ()
 
 let ssl_shutdown (fd, s) =
   match s with
