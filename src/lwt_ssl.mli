@@ -74,6 +74,7 @@ val close : socket -> unit Lwt.t
 val in_channel_of_descr : ?buffer:Lwt_bytes.t -> socket -> Lwt_io.input_channel
 val out_channel_of_descr : ?buffer:Lwt_bytes.t -> socket -> Lwt_io.output_channel
 
+val close_notify : socket -> bool Lwt.t
 val ssl_shutdown : socket -> unit Lwt.t
 
 val abort : socket -> exn -> unit

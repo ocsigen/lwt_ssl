@@ -168,6 +168,13 @@ let ssl_shutdown (fd, s) =
 
 let shutdown (fd, _) cmd = Lwt_unix.shutdown fd cmd
 
+let close_notify = function
+  | (_, Plain) as s ->
+      shutdown s Unix.SHUTDOWN_SEND;
+      Lwt.return_true
+  | (fd, SSL s) ->
+      repeat_call fd (fun () -> Ssl.close_notify s)
+
 let close (fd, _) = Lwt_unix.close fd
 
 let abort (fd, _) = Lwt_unix.abort fd
