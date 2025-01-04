@@ -68,7 +68,7 @@ val write_bytes : socket -> Lwt_bytes.t -> int -> int -> int Lwt.t
 val wait_read : socket -> unit Lwt.t
 val wait_write : socket -> unit Lwt.t
 
-val shutdown : socket -> Unix.shutdown_command -> unit
+val shutdown : socket -> Unix.shutdown_command -> unit Lwt.t
 val close : socket -> unit Lwt.t
 
 val in_channel_of_descr : ?buffer:Lwt_bytes.t -> socket -> Lwt_io.input_channel
